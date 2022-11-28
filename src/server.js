@@ -1,42 +1,34 @@
+import "./models/Video";
 import express from "express";
-import { isNamedExportBindings } from "typescript";
-
-const PORT = 4000;
+import morgan from "morgan";
+import session from "express-session";
+import MongoStore from "connect-mongo";
+import rootRouter from "./routers/rootRouter";
+import userRouter from "./routers/userRouter";
+import videoRouter from "./routers/videoRouter";
+import { localsMiddleware } from "./middlewares";
 
 const app = express();
+const logger = morgan("dev");
 
-const logger = (req, res, next) => {
-    console.log(`${req.method} ${req.url}`);
-    next();
-}
-
-const privateMiddleware = (req, res, next) => {
-    const url = req.url;
-    if(url === "/protected") {
-        return res.send("<h1>Not Allowed</h1>")
-    }
-    console.log("Allowed, you may continue");
-    next();
-}
-
-const handleHome = (req, res, next) => {
-    return res.send("I love middlewares");
-}
-
-const handleProtected = (req, res, next) => {
-    return res.send("Welcome to the private lounge.")
-}
-
-/*const handleLogin = (req,res) => {
-    return res.send("Login here.")
-}*/
+app.set("view engine", "pug");
+app.set("views", process.cwd() + "/src/views");
 app.use(logger);
-app.use(privateMiddleware);
-app.get("/", handleHome);
-app.get("/protected", handleProtected);
-/*app.get("/login", handleLogin);*/
+app.use(express.urlencoded({ extended: true }));
 
-const handleListening = () => console.log(`Server Listening on port http://localhost${PORT}`);
+app.use(
+    session({
+        secret: process.env.COOKIE_SECRET,
+        resave: false,
+        saveUninitialized: false,
+        store: MongoStore.create({ mongoUrl: process.env.DB_URL }),
+    })
+);
 
-app.listen(PORT, handleListening);
+app.use(localsMiddleware);
+app.use("/uploads", express.static("uploads"));
+app.use("/", rootRouter);
+app.use("/users", userRouter);
+app.use("/videos", videoRouter);
 
+export default app;
